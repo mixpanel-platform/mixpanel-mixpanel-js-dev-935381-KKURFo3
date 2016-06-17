@@ -7,44 +7,46 @@
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
   </head>
   <body class="mixpanel-platform-body">
-    <div class="mixpanel-platform-section">
-      <div id="eventSelect" style="float: left;"></div>
-      <div id="by" class="mixpanel-platform-label" style="margin-left: 10px; display: none;">by</div>
-      <div id="propSelect" style="float: left;"></div>
-      <div id="dateSelect" style="float: right;"></div>
-      <div style="clear: both;"></div>
-      <div id="graph"></div>
-    </div>
-    <div id="table"></div>
     <script>
-      var eventSelect = $('#eventSelect').MPEventSelect();
-      var propSelect  = $('#propSelect').MPPropertySelect();
-      var dateSelect  = $('#dateSelect').MPDatepicker();
-      var eventGraph  = $('#graph').MPChart({chartType: 'line'});
-      var eventTable  = $('#table').MPTable({
-        showPercentages: true,
-        firstColHeader: 'Event'
-      });
+function jqlQuery() {
+		
+var params = {
+  goodEvents: ['View Trial Page', 'Sign up for Trial'],
+  badEvents: ['Complete Chat', 'Complete Session']
+};
 
-      var runQuery = function() {
-        var eventName = eventSelect.MPEventSelect('value'),
-            propName  = propSelect.MPPropertySelect('value'),
-            dateRange = dateSelect.MPDatepicker('value');
+var query = function main() {
+  return Events({
+    from_date: '2016-06-01',
+    to_date: '2016-06-10'
+  })
+  .groupByUser(function(state, events) {
+    state = state || {goodEvents: [], badEvents: false};
+    var stateUpdater = function(event) {
+      state.goodEvents = _.contains(params.goodEvents, event.name)?
+                            _.union(state.goodEvents, [event.name]) :
+                            state.goodEvents;
+      state.badEvents = state.badEvents || (!state.badEvents && _.contains(params.badEvents, event.name));
+    };
+    _.each(events, stateUpdater);
+    return state;
+  })
+  //filter out users that have done the good events and haven't done the bad events
+  .filter(state => state.value.goodEvents.length == params.goodEvents.length && !state.value.badEvents)
+  //if you want a count, use this reducer
+  .reduce(mixpanel.reducer.count());
+  //if you want a list of distinct_ids, comment out the reduce and use this map
+  // .map(state => state.key[0]);
+}
 
-        if (eventName) {
-          MP.api.segment(eventName, propName, dateRange).done(function(results) {
-            eventGraph.MPChart('setData', results);
-            eventTable.MPTable('setData', results);
-          });
-        }
-      };
-      eventSelect.on('change', function(e, eventName) {
-        propSelect.MPPropertySelect('setEvent', eventName);
-        $("#by").show();
-        runQuery();
-      });
-      propSelect.on('change', runQuery);
-      dateSelect.on('change', runQuery);
+MP.api.jql(query, params).done(function(results){
+  console.log(results)
+  document.write(results)
+})
+
+
+
+}
     </script>
   </body>
 </html>
